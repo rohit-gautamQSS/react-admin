@@ -5,9 +5,16 @@
 import { createStore, applyMiddleware, compose } from 'redux';
 import { routerMiddleware } from 'connected-react-router';
 import createSagaMiddleware from 'redux-saga';
+import { all, fork } from 'redux-saga/effects';
+import { adminSaga } from 'react-admin';
 import createReducer from './reducers';
 
-export default function configureStore(initialState = {}, history) {
+export default function configureStore(
+  initialState = {},
+  dataProvider,
+  authProvider,
+  history,
+) {
   let composeEnhancers = compose;
   const reduxSagaMonitorOptions = {};
 
@@ -26,6 +33,15 @@ export default function configureStore(initialState = {}, history) {
     //   };
     /* eslint-enable */
   }
+
+  const saga = function* rootSaga() {
+    yield all(
+      [
+        adminSaga(dataProvider, authProvider),
+        // add your own sagas here
+      ].map(fork),
+    );
+  };
 
   const sagaMiddleware = createSagaMiddleware(reduxSagaMonitorOptions);
 
@@ -47,6 +63,7 @@ export default function configureStore(initialState = {}, history) {
   store.injectedReducers = {}; // Reducer registry
   store.injectedSagas = {}; // Saga registry
 
+  sagaMiddleware.run(saga);
   // Make reducers hot reloadable, see http://mxs.is/googmo
   /* istanbul ignore next */
   if (module.hot) {
