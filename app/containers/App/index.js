@@ -10,13 +10,11 @@
 import React from 'react';
 import history from 'utils/history';
 import { Admin, Resource } from 'react-admin';
-import UserList from 'components/UserList';
-import UserCreate from 'components/UserCreate';
-import UserView from 'components/UserView';
-import UserEdit from 'components/UserEdit';
-import dataProvider from '../../dataProvider';
+import { UserList, UserCreate, UserView, UserEdit } from 'components/User';
+import DataProvider from '../../dataProvider';
 
 export default function App() {
+  const dataProvider = new DataProvider('qss');
   return (
     <Admin dataProvider={dataProvider} history={history}>
       <Resource

@@ -1,62 +1,130 @@
-/* eslint-disable no-underscore-dangle */
-/* eslint-disable func-names */
 /* eslint-disable no-unused-vars */
-/* eslint-disable-next-line func-names */
-/* eslint-disable-next-line no-unused-vars */
-import db from './db';
+/* eslint-disable no-case-declarations */
+/* eslint-disable prefer-destructuring */
+/* eslint-disable no-param-reassign */
+/* eslint-disable no-underscore-dangle */
+/* eslint-disable camelcase */
+import {
+  GET_LIST,
+  GET_ONE,
+  GET_MANY,
+  GET_MANY_REFERENCE,
+  CREATE,
+  UPDATE,
+  DELETE,
+} from 'react-admin';
+import PouchDB from 'pouchdb';
+import PouchDB_find from 'pouchdb-find';
+import shortuuid from 'short-uuid';
 
-const dataProvider = {
-  getList: (_resource, _params) =>
-    db
-      .allDocs({
-        include_docs: true,
-        attachments: true,
-      })
-      .then(data => ({ data: data.rows, total: data.total_rows })),
+PouchDB.plugin(PouchDB_find);
 
-  getOne: (_resource, params) =>
-    db
-      .get(params.id)
-      .then(function(doc) {
-        return { data: doc };
-      })
-      // eslint-disable-next-line func-names
-      .catch(function(err) {
-        return err;
-      }),
-
-  getMany: (_resource, _params) => {},
-
-  getManyReference: (_resource, _params) => {},
-
-  update: (_resource, params) =>
-    db
-      .put({
-        ...params.data.doc,
-        id: params._id,
-      })
-      .then(function(response) {
-        return { data: response };
-      })
-      .catch(function(err) {
-        return err;
-      }),
-
-  updateMany: (_resource, _params) => {},
-
-  create: (_resource, params) =>
-    db
-      .post(params.data)
-      .then(function(response) {
-        const doc = { ...params.data, id: response.id };
-        return { data: doc };
-      })
-      .catch(function(err) {
-        return err;
-      }),
-
-  delete: (_resource, _params) => {},
-  deleteMany: (_resource, _params) => {},
+const fromPouchDoc = doc => {
+  doc.id = doc._id.split('/')[1];
+  return doc;
 };
 
-export default dataProvider;
+export default database => {
+  const db = new PouchDB(database);
+  /**
+   * @param {String} type One of the constants appearing at the top if this file, e.g. 'UPDATE'
+   * @param {String} resource Name of the resource to fetch, e.g. 'posts'
+   * @param {Object} params The REST request params, depending on the type
+   * @returns {Object} { url, options } The HTTP request parameters
+   */
+  const convertRESTRequestToPouch = (type, resource, params) => {
+    switch (type) {
+      case GET_LIST:
+        const page =
+          params.pagination && params.pagination.page != null
+            ? params.pagination.page
+            : 1;
+        const perPage =
+          params.pagination && params.pagination.perPage != null
+            ? params.pagination.perPage
+            : 10;
+        let field =
+          params.sort && params.sort.field != null ? params.sort.field : '_id';
+        const order =
+          params.sort && params.sort.order != null ? params.sort.order : 'ASC';
+        if (field === 'id') field = '_id';
+        const query = {
+          selector: {
+            _id: {
+              $gt: `${resource}/`,
+              $lt: `${resource}/\ufff0`,
+            },
+          },
+          sort: [{ [field]: order.toLowerCase() }],
+          limit: perPage,
+          skip: (page - 1) * perPage,
+        };
+        return db.find(query);
+      case GET_ONE:
+        return db.get(`${resource}/${params.id}`);
+      case GET_MANY:
+        return db.allDocs({
+          include_docs: true,
+          keys: params.ids.map(id => `${resource}/${id}`),
+        });
+      case GET_MANY_REFERENCE:
+        return db.find({
+          selector: { [params.target]: params.id },
+        });
+      case CREATE:
+        const uuid = shortuuid.generate();
+        params.data._id = `${resource}/${uuid}`;
+        return db.put(params.data);
+      case UPDATE:
+        delete params.data.id;
+        return db.put(params.data);
+      case DELETE:
+        return db.get(`${resource}/${params.id}`).then(doc => db.remove(doc));
+      default:
+        throw new Error(`Unsupported fetch action type ${type}`);
+    }
+  };
+
+  /**
+   * @param {Object} response HTTP response from fetch()
+   * @param {String} type One of the constants appearing at the top if this file, e.g. 'UPDATE'
+   * @param {String} resource Name of the resource to fetch, e.g. 'posts'
+   * @param {Object} params The REST request params, depending on the type
+   * @returns {Object} REST response
+   */
+  const convertPouchResponseToREST = (response, type, resource, params) => {
+    switch (type) {
+      case GET_ONE:
+        return { data: fromPouchDoc(response) };
+      case GET_LIST:
+      case GET_MANY_REFERENCE:
+        return {
+          data: response.docs.map(fromPouchDoc),
+          total: response.docs.length,
+        };
+      case GET_MANY:
+        return {
+          data: response.rows.map(r => fromPouchDoc(r.doc)),
+          total: response.total_rows,
+        };
+      case CREATE:
+      case UPDATE:
+      case DELETE:
+      default:
+        return { data: response };
+    }
+  };
+
+  /**
+   * @param {string} type Request type, e.g GET_LIST
+   * @param {string} resource Resource name, e.g. "posts"
+   * @param {Object} payload Request parameters. Depends on the request type
+   * @returns {Promise} the Promise for a REST response
+   */
+  return (type, resource, params) => {
+    const response = convertRESTRequestToPouch(type, resource, params);
+    return Promise.resolve(response).then(resp =>
+      convertPouchResponseToREST(resp, type, resource, params),
+    );
+  };
+};

@@ -80,6 +80,7 @@
     "lodash": "4.17.11",
     "minimist": "1.2.0",
     "pouchdb": "^7.2.1",
+    "pouchdb-find": "^7.2.1",
     "prop-types": "15.7.2",
     "react": "^16.13.1",
     "react-admin": "^3.7.1",
@@ -92,6 +93,7 @@
     "redux-saga": "1.0.2",
     "reselect": "4.0.0",
     "sanitize.css": "8.0.0",
+    "short-uuid": "^3.1.1",
     "styled-components": "4.2.0"
   },
   "devDependencies": {
