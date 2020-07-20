@@ -12,8 +12,6 @@ import {
   TextInput,
   required,
 } from 'react-admin';
-// import PropTypes from 'prop-types';
-// import styled from 'styled-components';
 
 function UserCreate(props) {
   return (

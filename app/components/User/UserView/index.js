@@ -13,9 +13,9 @@ function UserView(props) {
   return (
     <Show title="User Details" {...props}>
       <SimpleShowLayout>
-        <TextField label="First Name" source="doc.firstName" />
-        <TextField label="Last" source="doc.lastName" />
-        <TextField label="Age" source="doc.age" />
+        <TextField label="First Name" source="firstName" />
+        <TextField label="Last" source="lastName" />
+        <TextField label="Age" source="age" />
       </SimpleShowLayout>
     </Show>
   );
